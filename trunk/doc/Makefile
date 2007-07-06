@@ -150,7 +150,10 @@ sysconfdir = ${prefix}/etc
 target_alias = 
 top_builddir = ..
 top_srcdir = ..
-EXTRA_DIST = www
+EXTRA_DIST = www/index.html www/naturalc.html www/Makefile \
+	docbook/content.xml  docbook/download.xml  docbook/license.xml  \
+	docbook/links.xml  docbook/Makefile  docbook/naturalc.xml  docbook/spec.xml
+
 all: all-am
 
 .SUFFIXES:
