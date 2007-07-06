@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<appendix id="spec">
+<title>Language specification</title>
+
+<section>
+<title>Reserved words</title>
+
+The following function names are reserved:
+	try, throw, require
+	
+The following label names are reserved:
+	catch, finally
+
+The following global variable names are reserved:
+	retval
+
+The following typedefs are reserved:
+	string_t, list_t, hash_t, file_t, socket_t
+</section>
+
+<section>
+<title>Functions</title>
+All functions must have a return type of 'int' and return an value of zero to indicate success, or -1 to indicate failure. 
+
+The global variable 'retval' is used to store the return value of each function. 
+
+The 'return' keyword has different semantics from Standard C. Instead of returning immediately from the function, the value of 'retval' will be set and control will jump to
+  the 'finally' label.
+
+</section>
+
+<section>
+<title>Exceptions</title>
+
+If an unrecoverable error occurs at any point within a function, control will be transferred to the 'catch' label. This is normally done via the throw() macro.  If the function does not define a label named 'catch', it will be created by the compiler and refer to an
+empty block of code at the end of the function just prior to any 'finally' label.
+
+If there are statements which should always be executed before the function returns, they should be placed after a label named 'finally'. These statements are guarenteed to be executed even if an exception is raised or the 'return' keyword is used.
+
+For all Natural C datatypes, if a function defines a local variable without initializing it, the variable will be automatically instantiated at the beginning of the function and automatically destroyed at the end of the function.  Conversely, if a local variable is explicitly initialized when it is defined, the compiler will not automatically instantiate and destroy the variable.
+
+</section>
+
+<section>
+<title>Assertions</title>
+A macro named require() is provided as a drop-in replacement for the assert() macro 
+found in the standard assert.h header. If the assertion fails, the require() macro
+will raise an exception instead of causing the program to immediately abort. In a
+future version of Natural C, the require() macro will be renamed to assert().
+
+</section>
+</appendix>
