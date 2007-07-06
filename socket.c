@@ -52,9 +52,6 @@ extern int      vasprintf(char **, const char *, va_list);
 /*** @todo make this configurable and documented */
 #define SOCKET_DEBUG 1
 
-/** @todo Grok these Splint errors */
-/*@-uniondef@*/
-
 /* Global OpenSSL context object */
 #if WITH_OPENSSL
 static SSL_CTX *TLS_CTX;
@@ -85,7 +82,6 @@ getpeereid(int fd, uid_t *euid, gid_t *egid)
 #endif
 
 
-#ifndef S_SPLINT_S
 /**
  * Start a TLS session on a socket that is already connected.
  *
@@ -127,7 +123,6 @@ socket_starttls(socket_t *s)
 	/* SA-NOTE: destroy(s->ssl) called during socket_destroy() */
 	/* SA-NOTE: destroy(s->bio) called during socket_destroy() */
 }
-#endif
 
 
 static int
@@ -258,7 +253,6 @@ socket_connect_inet(socket_t *s, string_t *host, const int port)
 		throw_errno("fcntl(2)");
 
 	/* Try to connect to each possible IP address */
-	/*@-type@*/
 	for (cur = inet->head; cur; cur = cur->next) {
 		str_to_inet(&sa.sin_addr, cur->value);
 		log_debug("connecting to %s port %d", cur->value->value, port);
@@ -285,7 +279,6 @@ socket_connect_inet(socket_t *s, string_t *host, const int port)
 
 		goto finally;
 	}
-	/*@=type@*/
 
 	/* Unable to connect to any of the remote addresses */
 	throw("connect(2)");
@@ -592,7 +585,6 @@ socket_bind(socket_t *s, string_t *address, int port)
 
 		default:
 			throw("unsupported socket domain");
-			/*@notreached@*/
 	}
 
 	/* Set the backlog */
@@ -609,7 +601,7 @@ socket_bind(socket_t *s, string_t *address, int port)
  * @param port remote port
 */
 int
-socket_connect(socket_t *s, /*@unique@*/ string_t *host, uint16_t port)
+socket_connect(socket_t *s, string_t *host, uint16_t port)
 {
 
 	s->direction = CONNECT;
@@ -639,8 +631,6 @@ socket_connect(socket_t *s, /*@unique@*/ string_t *host, uint16_t port)
 }
 
 
-/** @todo Splint can't handle 'fd_set' types; this is skipped */
-#ifndef S_SPLINT_S
 /**
  * Call select(2) to wait for an event on a socket.
  *
@@ -738,7 +728,6 @@ retry:
 		s->status.exception = 1;
 	}
 }
-#endif /* S_SPLINT_S */
 
 
 static int
@@ -834,7 +823,6 @@ socket_read_tls(socket_t *sock, var_char_t *buf, size_t size)
 
 		default:
 			throwf("SSL_read(3) returned an undefined error %d", i);
-			/*@notreached@*/
 
 	}
 
@@ -1072,7 +1060,6 @@ socket_get_peer_addr(string_t *dest, socket_t *src)
 
 		default:
 			throwf("socket family %d not supported", src->family);
-			/*@notreached@*/
 	}
 }
 

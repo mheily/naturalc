@@ -99,14 +99,12 @@ signal_library_init()
 int
 signal_mask_all(void)
 {
-#ifndef S_SPLINT_S
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) signal(SIGINT, SIG_IGN);
 	(void) signal(SIGQUIT, SIG_IGN);
 	(void) signal(SIGTSTP, SIG_IGN);
 	(void) signal(SIGUSR1, SIG_IGN);
 	(void) signal(SIGUSR2, SIG_IGN);
-#endif
 }
 
 
@@ -116,13 +114,11 @@ signal_mask_all(void)
 int
 signal_unmask_all()
 {
-#ifndef S_SPLINT_S
 	(void) signal(SIGHUP, SIG_DFL);
 	(void) signal(SIGINT, SIG_DFL);
 	(void) signal(SIGQUIT, SIG_DFL);
 	(void) signal(SIGTSTP, SIG_DFL);
 	(void) signal(SIGUSR1, SIG_DFL);
-#endif
 }
 
 

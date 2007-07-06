@@ -103,13 +103,8 @@ extern const string_t EMPTY_STRING;
 
 /**
  * New, fancy C99 way to convert a (const char *) to a (const string *)
- *
  */
-#ifndef S_SPLINT_S
 #define CSTRING(x)	(&(const string_t){ x, sizeof(x) - 1, sizeof(x), false })
-#else
-#define CSTRING(x)	&EMPTY_STRING
-#endif
 
 #define str_assert(s)	(s != NULL && s->value != NULL)
 

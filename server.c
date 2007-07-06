@@ -280,14 +280,12 @@ server_accept(server_t *srv)
 
 	/* Create a new thread */
 	/** @todo proper casting */
-	/*@-type@*/
 	if (thread_create_detached((callback_t) session_handler, session) < 0 ) {
 		session_controller_invoke(session, SESSION_OVERLOAD, NULL);
 		(void) session_close(session);
 		session_destroy(&session);
 		return 0;
 	}
-	/*@=type@*/
 
 #if DEADWOOD
 	// old event-driven code

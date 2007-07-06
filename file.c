@@ -168,7 +168,6 @@ file_exists(bool *result, const string_t *path)
 				log_warning("unable to access %s", path->value);
 				throw_errno("stat(2)");
 				break;
-				/*@notreached@*/
 		}
 	} else {
 		*result = true;
@@ -342,13 +341,11 @@ file_lock(file_t *f, int lock_type)
 	struct flock fl;
 
 	/* convert int to short int */
-	/*@+ignorequals@*/
 	fl.l_type   = lock_type;	/* Any of: F_WRLCK | F_RDLCK | F_UNLCK */
 	fl.l_whence = SEEK_SET;
 	fl.l_start  = 0;
 	fl.l_len    = 0;
 	fl.l_pid    = getpid();
-	/*@=ignorequals@*/
 
 	/* Make sure the file is open */
 	if (f->fd < 0)

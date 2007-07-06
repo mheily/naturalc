@@ -56,13 +56,11 @@ server_run_tests(void)
 	thread_t thread;
 	long      rc;
 
-       /*@-null@*/
         static int       (*constructor[])(server_t *) = 
         {
                 init_echo_server,
                 NULL
         };
-        /*@=null@*/
 
 	set_log_level(LOG_DEBUG);
 
@@ -222,13 +220,11 @@ db_run_tests(test_env_t *env)
 	//@todo start_test ("db_create()", ...);
 
 	/* NOTE: This runs twice to check for an obscure bug */
-	/*@+matchanyintegral@*/
 	start_test("db_get_id()");
 	db_get_id(&id, db, "map", "name", cell);
 	test_retval((int) id, 2);
 	db_get_id(&id, db, "map", "name", cell);
 	test_retval((int) id,2);
-	/*@=matchanyintegral@*/
 
 	/* Test table functions */
 

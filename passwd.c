@@ -50,7 +50,7 @@
 # define passwd_getpwuid(a,b,c,d,e)   getpwuid_r(a, b, c, d, e)
 #else
 
-/*@null@*/ mutex_t PWDB_MUTEX = MUTEX_INITIALIZER;
+mutex_t PWDB_MUTEX = MUTEX_INITIALIZER;
 
 /**
  * Replacement for getpwuid_r(3) and getpwnam_r(3) for some systems.
@@ -58,7 +58,7 @@
  */
 static int
 __getpw_r(bool by_name, void *match, struct passwd *pwbuf, 
-		/*@unused@*/ char *buf, /*@unused@*/ size_t buflen, struct passwd **pwbufp)
+		char *buf, size_t buflen, struct passwd **pwbufp)
 {
 	uid_t          *uid;
 	struct passwd  *pwent;

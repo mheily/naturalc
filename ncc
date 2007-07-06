@@ -23,7 +23,7 @@ use warnings;
 use Data::Dumper;
 use Carp;
 
-# The version number of the compiler
+# The version number of the compiler (FIXME- this is always wrong)
 our $NCC_VERSION = '0.3';
  
 # If TRUE, debugging information will be enabled:
@@ -711,40 +711,6 @@ next_line:
 	return $outfn;
 }
 
-#
-# Invoke the splint(1) static analysis tool on a source file
-#  
-sub run_splint($)
-{
-	my $path = shift;
-
-	# Generate a list of header inclusion paths
-	my @inc;
-	foreach my $base (@INCLUDES) {
-		push @inc, '-I' . $base;
-	}
-	my $includes = join(' ', @inc);
-	
-	# splint(1) requires various preprocessor #defines
- 	my $defs = '-Dclass=struct -DUNIT_TESTS=1 -DWITH_OPENSSL=0 -Du_int=uint32_t -Du_short=uint8_t -Du_char=char -Din_addr_t=int -Dkey_t=int -D__OpenBSD__=1 -Du_int32_t=uint32_t -Du_int16_t=uint16_t -DHAVE_PTHREAD_H -DWITH_NDBM -Devent_t="struct epoll_event" -Dsighandler_t="void *"';
-
-	# Workaround for NDBM header problem on OpenBSD
-	$defs .= ' -DHAVE_NDBM_H=1' if -e '/usr/include/ndbm.h';
-
-	# Ignore certain warnings
-	my $ignores = '-preproc -globs -unrecog -usedef -nullderef -exportlocal -predboolint -nullpass -nullstate -compdef -compdestroy +boolint -unqualifiedtrans -mustfreeonly -branchstate -dependenttrans -usereleased -kepttrans -onlytrans -temptrans -observertrans -immediatetrans -compmempass +charintliteral -boolops +posixlib -uniondef';
-
-	# Invoke splint(1) on Linux systems
-	# NOTE: Splint is not run on OpenBSD (or other systems)
-	# 	because in it's current state it has trouble parsing
-	#	system headers, and throws impossible-to-fix errors 
-	#	for many basic types like in_addr_t.
-	if (`uname` =~ /Linux/) {	
-		run_system "splint -I. -I.. +quiet $includes $defs $ignores $path";
-	}
-
-	return $path;
-}
 
 sub MAIN()
 {
@@ -774,8 +740,7 @@ sub MAIN()
 			die 'invalid filename' 
 				unless $arg =~ m|^[A-Za-z0-9/_.-]+$|;
 			push @src, $arg;
-			push @NEW_ARGV, $ENV{NCC_SPLINT} ? run_splint( parser($arg) )
-						: parser($arg);
+			push @NEW_ARGV, parser($arg);
 		}
 
 		# Add additional header inclusion paths 

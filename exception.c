@@ -31,9 +31,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Permit functions in this module to manipulate va_list types */
-/*@access va_list,@*/
-
 int _throwf(   const char *func,
 		const char *file,
 		int         lineno, 
@@ -77,14 +74,4 @@ int _throwf(   const char *func,
 
 	va_end(ap);
 	return -1;
-}
-
-
-/**
- * Splint does not support variadic macros.. so define an empty variadic function in it's place.
- */
-int
-splint_variadic_macro(/*@unused@*/void *arg, ...)
-{
-      return arg == NULL;
 }
