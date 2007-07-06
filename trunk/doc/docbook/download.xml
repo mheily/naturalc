@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<chapter id="download">
+<title>Obtaining a copy of Natural C</title>
+
+<section>
+<title>Prerequisites</title>
+
+<para>
+In order to download and build the project sources, you will need the following:
+</para>
+
+<itemizedlist>
+
+<listitem>
+A POSIX-compatible operating system, such as Linux, SunOS, MacOS/X or BSD.
+</listitem>
+
+<listitem>
+GNU Autoconf and Automake
+</listitem>
+
+<listitem>
+	A <ulink url="http://subversion.tigris.org/">Subversion</ulink> (SVN) client
+</listitem>
+
+<listitem>
+The GCC compiler, preferably version 4.0 or higher
+</listitem>
+
+</itemizedlist>
+</section>
+
+<section>
+<title>Downloading</title>
+<para>
+To get the latest and greatest development sources from the SVN repository, run the following commands:
+</para>
+
+<programlisting>
+svn co http://naturalc.org/svn/ncc/trunk ncc
+cd ncc
+autoreconf -f -i
+</programlisting>
+
+<para>
+At this time, there are no source tarballs or binary packages available.
+</para>
+
+</section>
+
+<section>
+<title>Building and installing</title>
+
+After you have acquired the source code, issue the following commands
+to build and install the Natural C compiler, headers, and library.
+
+<programlisting>
+./configure
+make
+make install
+</programlisting>
+</section>
+
+</chapter>

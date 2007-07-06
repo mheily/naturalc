@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+                  "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd" [
+  <!ENTITY content SYSTEM "content.xml">
+  <!ENTITY download SYSTEM "download.xml">
+  <!ENTITY spec SYSTEM "spec.xml">
+  <!ENTITY license SYSTEM "license.xml">
+  <!ENTITY links SYSTEM "links.xml">
+]>
+<book id="design" lang="en">
+<bookinfo>
+  <title>The Natural C programming language</title>
+  <author><firstname>Mark</firstname><surname>Heily</surname>
+  <email>mark@heily.com</email>
+  </author>
+
+     <copyright>
+     <year>2007</year>
+     <holder>Mark Heily</holder>
+     </copyright>
+
+
+<legalnotice>
+<para>
+Permission to use, copy, modify, and distribute this document for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+</para>
+</legalnotice>
+
+<revhistory>
+
+  <revision>
+    <revnumber>1.0</revnumber>
+    <date>February 17th 2007</date>
+    <revremark>First Edition</revremark>
+  </revision>
+</revhistory>
+
+</bookinfo>
+
+  &content;
+  &download;
+  &spec;
+  &links;
+  &license;
+</book>

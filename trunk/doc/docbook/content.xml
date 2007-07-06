@@ -1,0 +1,734 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<chapter id="intro">
+<title>Introduction</title>
+
+<section>
+<title>Overview</title>
+<para>
+Natural C is a dialect of the C programming language that allows programmers to write in a more concise and natural style.
+
+This leads to smaller, more readable programs that are easier to review and validate.
+
+It reduces the risk of buffer overflows by providing a core set of dynamic datatypes that automatically resize their memory as items are added to them.
+</para>
+
+The Natural C compiler takes care of error handling and memory management, leaving the programmer free to concentrate on the structure and meaning of the program.
+</section>
+
+<section>
+<title>Features</title>
+<para>
+The main features are:
+</para>
+
+
+
+<itemizedlist>
+
+<listitem>
+Support for <link linkend="datatypes">dynamic datatypes</link> including strings, lists, and hash tables
+</listitem>
+
+<listitem>
+Basic support for simplified <link linkend="oop">object-oriented programming</link>.
+</listitem>
+
+<listitem>
+Automatic <link linkend="exceptions">exception handling</link>.
+</listitem>
+
+<listitem>
+Automatic memory management via reference counting <link linkend="gc">garbage collection</link>.
+</listitem>
+
+<listitem>
+Automatically generated <link linkend="assertions">assertions</link> guarding each function.
+</listitem>
+
+<listitem>
+Support for <link linkend="logging">logging</link> messages to the standard error, or to a file.
+</listitem>
+
+<listitem>
+A standard library of useful abstractions for various POSIX facilities.
+</listitem>
+
+<listitem>
+Produces object code that is <link linkend="compat">compatible with C</link> and C++ 
+</listitem>
+
+</itemizedlist>
+</section>
+
+<section>
+<title>Implementation</title>
+<para>
+A working prototype of a Natural C compiler has been written in Perl, and eventually a GCC frontend will be written to add the language to the GNU Compiler Collection.  The prototype compiler is actually more like a preprocessor that parses Natural C source code, adds exception handling and allocation/deallocation statements as needed, and generates C source code. This generated C source code is then compiled into object code by GCC.
+Eventually, when the Natural C language becomes more mature and well-tested, the Perl prototype will be replaced with a proper GCC frontend.
+</para>
+</section>
+
+<section>
+<title>Hello World</title>
+
+<para>
+The following code is the classic 'Hello World' program, in Natural C.
+</para>
+
+<programlisting>
+<![CDATA[
+#include <nc/lang.h>
+
+int
+main(int argc, char **argv[])
+{
+	string_t *message;
+
+	str_cpy(message, "Hello world");
+	file_print(STDOUT, message);
+}
+]]>
+</programlisting>
+</section>
+
+</chapter>
+
+<chapter>
+<title>
+Differences between C and Natural C
+</title>
+
+<para>
+There are a few major differences between C and Natural C. 
+</para>
+
+<para>
+<table border="2" width="90%" align="center">
+<caption>Differences between C and Natural C</caption>
+<tr>
+<th width="50%">C</th>
+<th width="50%">Natural C</th>
+</tr>
+
+<tr>
+	<td>Functions may return any type.</td>
+	<td>Functions must return an 'int' type.</td>
+</tr>
+
+<tr>
+	<td>A function's return value is user-defined.</td>
+	<td>Functions must return either 0 to indicate success, or -1 to indicate failure.</td>
+</tr>
+
+<tr>
+	<td>Functions with a non-void return type need a 'return' statement.</td>
+	<td>Functions never need to have a 'return' statement.</td>
+</tr>
+
+<tr>
+	<td>By default, the return value of a function is ignored.</td>
+	<td>If the return value of a function is not explicitly checked, the compiler will
+	generate code to check the value and throw an exception if the return value is non-zero.
+	</td>
+</tr>
+
+<tr>
+	<td>It is legal to pass a NULL pointer as an argument to a function.</td>
+	<td>Passing a NULL pointer as an argument to a function will cause a
+		runtime exception.
+		</td>
+</tr>
+
+<tr>
+	<td>By default, local variables are uninitialized.</td>
+	<td>Local variables that are objects will be automatically instantiated at the beginning of the function, and automatically destroyed at the end of the function.
+	</td>
+</tr>
+
+<tr>
+	<td>A string is defined as a pointer to a NUL-terminated character array.</td>
+	<td>The string_t datatype is used to represent a string.</td>
+</tr>
+
+<tr>
+	<td>The 'assert' macro is used to implement assertions. If an assertion fails, the program is terminated.</td>
+	<td>The 'require' macro is used to implement assertions. If an assertion fails, an exception is thrown.</td>
+</tr>
+
+</table>
+
+</para>
+
+
+
+<para>
+In C, the type and meaning of a function's return value is at the discretion
+of the programmer. In Natural C, all functions have a return type of 'int' and must return 0 to indicate success, or -1 to indicate failure. It is typical for Natural C functions to omit the 'return' statement altogether, as the compiler will take care of returning the correct value.
+</para>
+
+<para>
+Since functions can only return 0 or 1, certain types of compound statements are effectively disallowed. For example, the following statement is legal in C but not allowed in Natural C:
+</para>
+
+<programlisting>
+<![CDATA[
+	foo(bar(baz(1), 2), 3);
+]]>
+</programlisting>
+
+<para>
+This is due to the fact that the return value of a function is used exclusively
+for exception handling. 
+</para>
+
+<para>
+It is perfectly legal, though not recommended, to chain together statements
+inside of a conditional like so:
+</para>
+
+<programlisting>
+<![CDATA[
+	if (foo() == 0 && bar() == 0 && baz() == 0) {
+		/* ... do something important ... */
+	} else {
+		/* ... complain loudly ... */
+	}
+]]>
+</programlisting>
+
+<para>
+The above expression is not very readable, and would be better written in
+Natural C as:
+</para>
+
+<programlisting>
+<![CDATA[
+	foo();
+	bar();
+	baz();
+	/* ... do something important ... */
+
+catch:
+	/* ... complain loudly ... */
+
+]]>
+</programlisting>
+
+<para>
+In standard C, it is legal to pass a NULL pointer to a function that accepts
+a pointer argument. In Natural C, all function arguments are automatically checked for NULL pointers and an exception will be raised if any parameter is NULL. If you really need to be able to pass a NULL pointer to a function, you must add the /*@null@*/ annotation to the function parameter's definition.
+</para>
+
+[[Deprecated C conventions]]
+
+<para>
+There are a number of conventions in C that have been deprecated in Natural C.
+</para>
+
+<itemizedlist>
+
+<listitem>
+Use string_t instead of char * to represent strings
+</listitem>
+
+<listitem>
+Use file_t instead of struct FILE
+</listitem>
+
+<listitem>
+The file_t class should be used instead of struct FILE.  The C library defines three FILE streams -- stdout, stdin, and stderr -- that point to the first three file descriptors in a program. Natural C uses file_t objects instead of FILE structs, and defines STDOUT, STDIN, and STDERR instead.
+</listitem>
+
+</itemizedlist>
+
+</chapter>
+
+<chapter id="datatypes">
+<title>Datatypes</title>
+
+<para>
+In addition to supporting all of the basic C datatypes, Natural C defines several new complex datatypes. 
+</para>
+
+<table width="90%" align="center" border="1">
+<caption>Datatypes</caption>
+<tr>
+<th>Type</th>
+<th>Description</th>
+</tr>
+
+<tr><td>string_t</td><td>A character string.</td></tr>
+<tr><td>list_t</td><td>A doubly-linked list of strings.</td></tr>
+<tr><td>hash_t</td><td>An associative array of key/value strings.</td></tr>
+<tr><td>file_t</td><td>An open file handle.</td></tr>
+<tr><td>socket_t</td><td>A socket.</td></tr>
+</table>
+
+<para>
+Natural C deprecates the use of static character arrays to store strings. Instead, the string_t type should be used.  The string_t type represents a single NUL-terminated character string which is dynamically reallocated as needed.  Replacement functions in the string library are prefixed with a 'str_'; for example, str_cpy, str_cat, and str_printf.
+</para>
+
+<para>
+The list_t type is a doubly-linked list of strings.
+</para>
+
+<para>
+The hash_t type is a hash map, sometimes called an associative array.
+</para>
+
+<para>
+The file_t type is a file in the filesystem. It contains information about the file descriptor, path, type, permissions, and contents of a file.
+</para>
+
+<para>
+The socket_t type is a generic interface to a bidirectional communication channel, such 
+as the Berkeley sockets. It currently supports TCP/IP sockets, UNIX-domain sockets, SSL sockets,
+   and "virtual sockets".
+</para>
+
+<para>
+In C, the programmer is free to ignore the return value of a function call. If a function call fails, but the programmer does not check for failure, the program continues as if nothing happened.
+</para>
+
+<para>
+In Natural C, if the programmer does not explicitly check the return value
+
+</para>
+
+[Writing reliable programs]
+
+<para>
+Programmers are notorious optimists, and if given the chance, would write code
+that never checks for bad things happening.
+</para>
+
+Example 1: a C program, how we would like it to be
+
+<programlisting>
+<![CDATA[
+int
+hello_world()
+{
+	char *s;
+	int   fd;
+
+	s = malloc(15);
+	strcpy(s, "Hello world");
+	fd = open("hello.txt", O_WRONLY, 0644);
+	write(fd, s, strlen(s));
+	close(fd);
+}
+]]>
+</programlisting>
+
+<para>
+Unfortunately, in the real world, bad things do happen to good programs, so
+the only thing we can do is to add error checking after each action.
+</para>
+
+Example 2: the same program, with error checking
+
+<programlisting>
+<![CDATA[
+int
+hello_world()
+{
+	char *s;
+	int fd;
+
+	if ((s = malloc(15)) == NULL) {
+		fprintf(stderr, "memory allocation error");
+		exit(EXIT_FAILURE);
+	}
+
+	if (strncpy(s, "Hello World") < 0) {
+		fprintf(stderr, "error copying string");
+		exit(EXIT_FAILURE);
+	}
+
+	if ((fd = open("hello.txt", O_WRONLY, 0644)) < 0) {
+		fprintf(stderr, "error opening file");
+		exit(EXIT_FAILURE);
+	}
+
+	if (write(fd, s, strlen(s) < 0) {
+		fprintf(stderr, "error writing to file");
+		exit(EXIT_FAILURE);
+	}
+
+	if (close(fd) < 0) {
+		fprintf(stderr, "error closing file");
+		exit(EXIT_FAILURE);
+	}
+}
+]]>
+</programlisting>
+
+<para>
+This creates a problem in that there is so much negativity in the code, so many
+checks for failure, that the 'good' code gets buried in the noise and is hard to see.
+Fortunately, Natural C provides a way to have one's cake and eat it too.
+</para>
+
+Example 3: the same program, in Natural C
+
+<programlisting>
+<![CDATA[
+int
+hello_world()
+{
+	string_t *s;
+	file_t   *f;
+
+	str_cpy(s, "Hello world");
+	file_open(f, "hello.txt", O_WRONLY, 0644);
+	file_write(f, s);
+	file_close(f);
+}
+]]>
+</programlisting>
+
+<para>
+At first glance, the above program seems like it doesn't have any error checks at all.
+That's where the magic of the compiler comes in; the compiler will add code to
+check the return value of each function and throw an exception if anything goes wrong.
+</para>
+
+<para>
+It also looks like the local variables 's' and 'f', which are pointers, are used without
+being initialized. But once again, the compiler generates code to call the objects' 
+constructors at the beginning of the function, and then call the objects' destructors 
+at the end.
+</para>
+
+<para>
+You should also note that the above code does not use any functions from the standard C
+library. Natural C provides it's own standard library that should be used instead of
+the standard C functions.
+</para>
+
+<para>
+Here's what the Natural C compiler would generate:
+</para>
+
+Example 4: the same program, in Natural C with additional compiler-generated code
+
+<programlisting>
+<![CDATA[
+int
+hello_world()
+{
+	string_t *s;
+	file_t   *f;
+
+	try (str_new(&s));
+	try (file_new(&f));
+	try (str_cpy(s, "Hello world"));
+	try (file_open(f, "hello.txt", O_WRONLY, 0644));
+	try (file_write(f, s));
+	try (file_close(f));
+
+finally:
+	str_destroy(&s);
+	file_destroy(&f);
+}
+
+]]>
+</programlisting>
+
+<para>
+You can see how the compiler wraps each statement in a try() macro call, which checks
+the return value of the function for errors. There is also a 'finally' block which executes
+at the end of the function.
+</para>
+
+<para>
+Since there is still some compiler magic going on in the above code, the following function
+is the raw C code, with all macros expanded and magic demystified.
+</para>
+
+Example 5: the same program, with Natural C translated into standard C
+
+<programlisting>
+<![CDATA[
+int
+hello_world()
+{
+	int retval = 0;
+	string_t *s;
+	file_t   *f;
+
+	if (str_new(&s) < 0)
+		goto catch;
+
+	if (file_new(&f) < 0)
+		goto catch;
+
+	if (str_cpy(s, "Hello world") < 0)
+		goto catch;
+
+	if (file_open(f, "hello.txt", O_WRONLY, 0644) < 0)
+		goto catch;
+
+	if (file_write(f, s) < 0)
+		goto catch;
+
+	if (file_close(f) < 0)
+		goto catch;
+
+	goto finally;
+
+catch:
+	retval = -1;
+
+finally:
+	(void) str_destroy(&s);
+	(void) file_destroy(&f);
+
+	return retval;
+}
+]]>
+</programlisting>
+
+</chapter>
+
+<chapter id="compat">
+<title>Compatibility with C and C++</title>
+[C Compatibility]
+
+<para>
+A program written in Natural C is also a syntactically valid C program that could be compiled
+using a normal C compiler.  However, the Natural C compiler generates additional error handling and memory management code that a standard C compiler would not generate.    
+
+Therefore, all Natural C source code files have the file extension '.nc' to distinguish them from ordinary C sources.
+</para>
+</chapter>
+
+<chapter id="oop">
+<title>Object-oriented programming</title>
+
+[Namespaces]
+
+Nat-C uses a simple prefix notation to declare a namespace for a group of functions. For example, if you had two classes, `person' and `animal' that both implemented a `walk' function, you would declare the functions as follows:
+
+   int person_walk();
+   int animal_walk();
+
+[Paradigm]
+
+<para>
+Natural C differs from previous efforts to extend C, such as C++ and Objective C, in
+that it does not provide any additional facilities for object-oriented programming.
+
+It does not provide polymorphism, dynamic dispatch, overloading, overriding, templates, and other OOP concepts.  
+
+Therefore, it may not be suitable for large projects containing millions of lines of code,
+or for certain types of programs like web browsers and word processors where an object-orientedlanguage would be more effective.
+</para>
+
+[Classes]
+
+<para>
+All Natural-C classes are expected to implement the following method naming conventions:
+
+	new		Allocate and initialize a new object
+	destroy		Destroy an object
+	truncate	Reset an object's contents to the state after new()
+	copy		Create a copy of an object
+	clone           Create a new reference to an existing object
+	move		Move all data from one object to another object
+	serialize	Generate a string representation of an object
+	deserialize	Convert a serialized string into an in-memory object
+	dump		Print a formatted version of the object to the error log
+</para>
+
+[Runtime Type Information (RTTI)]
+
+Limited support for run-time type information (RTTI) exists, though it's use 
+is strongly discouraged.  Classes that support RTTI will have a type signature as the first
+first member of the struct that defines them. This type signature points to an entry
+in a global type table that gives information about the storage size of the type, it's
+constructors and destructors, etc.
+
+In the future, RTTI may be used internally to support garbage collection.
+
+
+
+</chapter>
+
+<chapter id="gc">
+<title>Memory management</title>
+
+<para>
+Natural C provides automatic memory management for all objects, so that the programmer
+never needs to invoke new() or destroy() on any object.
+</para>
+
+<para>
+Variables can be manually allocated by invoking the new() method, and deallocated by calling the destroy() method. 
+
+If a local variable is not explicitly initialized to NULL, the compiler will add a new() call
+at the beginning of the function, and a destroy() call at the end of the function. 
+
+An object's reference count is increased by one every time the clone() method is called, and decreased by one every time the destroy() method is called.
+
+When an object's reference count reaches zero, it is placed on a 'free list' with other
+objects of the same type. When new() is called, it checks the free list to see if there
+are any objects on the free list that can be recycled before allocating memory for a new object.
+
+If the program runs out of virtual memory, objects on the free list may be deallocated to reduce the size of the working set.
+
+</para>
+
+</chapter>
+
+<chapter>
+<title>The Natural C library</title>
+<sect3>
+
+<para>
+All programs written in Natural C are linked against the Natural C library. 
+This library provides a rich set of abstract datatypes including strings, lists, hashes, files, sockets, and more.
+
+All functions in the Natural C library use prefixes to provide a private namespace.
+For example, all functions in the 'list' class have the 'list_' prefix. 
+</para>
+	
+</sect3>
+</chapter>
+
+<chapter id="exceptions">
+<title>Exceptions</title>
+<sect3>
+
+<para>
+The traditional way of handling error conditions in C is to check the return
+value of each function call. In practice, this means that every statement
+in a C program must be surrounded by an 'if/then' conditional. If the programmer
+does not explicitly check the result of a function call, any failures will
+be silently ignored. 
+
+Languages like C++ and Java implement exceptions as a separate runtime mechanism that 
+is orthogonal
+to a function's return value.  When an exception is thrown, the runtime unwinds the 
+stack, looks up the address of an appropriate exception handler, and performs a non-local exit. 
+This can be an expensive operation, which is why most C++ guidebooks recommend using
+return values wherever possible and only using exceptions for unusual events such as 
+out-of-memory errors or I/O errors.
+
+In Natural C, exceptions are implemented at compile-time using a combination of macros, labels, 'goto' statements, and the function's return value.  All of the underlying implementation details are hidden, so the programmer only needs to deal with the 'try/throw/catch/finally' concepts.
+All functions must have a return type of 'int' and return an value of zero to indicate success, or -1 to indicate failure. 
+</para>
+
+<para>
+Natural C exceptions are untyped, unlike Java/C++ exceptions. It is not possible to determine
+what caused an exception to be thrown. All exceptions are handled by a single 'catch' block
+inside the function.
+</para>
+
+<para>
+Under the surface, the compiler generates additional code to perform the exception handling.
+An integer variable named 'retval' is inserted into each function.
+The 'try' call is a macro which replaces a single statement with a conditional;
+for example, a statement 'x' would be transformed into 'if (x != 0) throw("error")'.
+The 'throw' call prints a message to the error log and then jumps to the 'catch' label.
+If control reaches the 'catch' label without an exception being thrown, retval is set to 0 and a 'goto finally' statement is executed. After executing code in the 'catch' block, retval is set to -1 and control naturally reaches the 'finally' label.  The 'finally' label which contains code that should be executed even if an exception is raised. After executing all code in the 'finally' block, the function returns with the value stored in the retval variable.
+</para>
+
+To illustrate the transformations that the NCC compiler performs, consider the following function:
+<programlisting>
+<![CDATA[
+int
+example_function()
+{
+	try (printf("hello "));
+
+catch:
+	printf("error ");
+
+finally:
+	printf("goodbye");
+}
+]]>
+</programlisting>
+
+After the NCC compiler parses this function, it emits the following C code:
+<programlisting>
+<![CDATA[
+int
+example_function()
+{
+	int retval = 0;
+
+	if (printf("hello") != 0) {
+		fprintf(stderr, __FILE__ ":" __LINE__  ": unhandled exception");
+		goto catch;
+	}
+
+	goto finally;
+
+catch:
+	printf("error ");
+	retval = -1;
+
+finally:
+	printf("goodbye");
+	return retval;
+}
+
+]]>
+</programlisting>
+
+</sect3>
+</chapter>
+
+<chapter id="assertions">
+<title>Assertions</title>
+
+The require() macro is very similar to the assert() macro provided by the C library. It takes
+a single argument and checks if the condition is true. If the condition is false, it raises
+an exception and aborts the function call.  Unlike the assert() macro, require() does not 
+abort the entire program if the condition is false; instead, it causes the function to
+immediately return a value of -1.
+</chapter>
+
+<chapter>
+<title>fixme</title>
+<sect3>
+
+[Datatypes]
+
+Natural C has built-in datatypes for creating and manipulating strings, hashes, and lists. 
+
+
+[The runtime library]
+
+All Natural-C programs are linked against the Natural-C runtime library.
+
+[Automake]
+
+Natural-C is supported by Automake...
+
+[Exceptions -- repeated]
+
+The most important feature of Natural C is it's exception handling mechanism. 
+In standard C, most functions are designed to return zero upon success and non-zero if
+an error occurred. This requires the programmer to check the result of each function call 
+for success, and mix error-handling code with normal code.
+
+Natural C defines the try() macro, the throw() macro, and uses the labels 'catch' and
+'finally'.
+
+The try() macro is similar to the 'try' keyword in Java/C++ in that it calls another
+function and tests the result.  If the called function returns with a non-zero return value, the calling function executes any statements in catch() block and returns -1.
+
+The 'finally' label is used to define a block of code that will always be be executed before
+the function returns, regardless of whether an exceptions was raised.
+
+</sect3>
+</chapter>
+
+<chapter id="logging">
+<title>Logging</title>
+Logging functions, etc... [TODO]
+</chapter>
