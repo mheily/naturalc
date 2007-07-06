@@ -175,9 +175,7 @@ thread_library_init()
 		throw_errno("pthread_attr_setstacksize(3)");
 
 	/* This is needed under GNU/Linux to prime the linker prior to chroot() */
-	/*@-type@*/
 	(void) pthread_create(&tid, &DETACHED_THREAD_ATTRIB, (void*(*)(void*)) pthread_exit, NULL);
-	/*@=type@*/
 
 	atexit(thread_library_atexit);
 }

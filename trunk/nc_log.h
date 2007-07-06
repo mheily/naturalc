@@ -23,9 +23,6 @@
 
 #include "nc_string.h"
 
-/* Splint cannot handle variadic macros, so they are hidden */ 
-#ifndef S_SPLINT_S
-
 #define _log_all(level, format,...) _log_message(level, "%s(%s:%d): "format, __func__, __FILE__, __LINE__, __VA_ARGS__)
 
 #define log_message(level, format,...) _log_all(level, format, __VA_ARGS__)
@@ -35,18 +32,6 @@
 #define log_info(format,...) _log_all(LOG_INFO, format, __VA_ARGS__)
 #define log_debug(format,...) _log_all(LOG_DEBUG, format, __VA_ARGS__)
 #define log_debug2(...) if (0) { ; }
-
-#else
-
-#define log_message  _log_message
-#define log_error    _log_error   
-#define log_warning  _log_warning
-#define log_notice   _log_notice
-#define log_info     _log_info
-#define log_debug    _log_debug
-#define log_debug2   _log_debug
-
-#endif
 
 void _log_vmessage(int level, const char *format, va_list ap);
 void _log_message(int level, const char *format, ...);

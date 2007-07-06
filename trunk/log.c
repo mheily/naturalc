@@ -37,9 +37,6 @@
 #include <execinfo.h>
 #endif
 
-/* Permit functions in this module to access va_list types */
-/*@access va_list,@*/
-
 /* GLOBAL VARIABLES */
 
 /* By default, copy all log output to the standard error */
@@ -116,9 +113,7 @@ set_log_level(int priority)
 	if (getenv("QUIET"))
 		priority = LOG_ERR;
 		
-	/*@-shiftnegative@*/
 	(void) setlogmask(LOG_UPTO(priority));
-	/*@=shiftnegative@*/ 
 
 	LOG_PRIORITY = priority;
 

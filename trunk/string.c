@@ -64,9 +64,6 @@ extern int      vasprintf(char **, const char *, va_list);
 
 const string_t EMPTY_STRING = { "", 0, 0, true };
 
-/* Allow functions to access members of the 'regex_t' abstract type */
-/*@access regex_t@*/
-
 /**
  * Copy from a NUL terminated character array to a string object.
  *
@@ -150,7 +147,7 @@ str_get_char(var_char_t *dest, string_t *str, size_t position)
  * @param position character position to split the string at
 */
 int
-str_divide(/*@unique@*/ string_t *left, /*@unique@*/ string_t *right, /*@unique@*/ const string_t *src, size_t position)
+str_divide(string_t *left, string_t *right, const string_t *src, size_t position)
 {
 	/* Make sure the <position> isn't greater than the length of the string */
 	if (position >= str_len(src))
@@ -269,7 +266,7 @@ str_set_terminator(string_t *str, int terminator)
  * @param src string to be copied
 */
 int
-str_copy(/*@unique@*/ string_t *dest, const string_t *src)
+str_copy(string_t *dest, const string_t *src)
 {
 	/* Don't copy two strings that share the same memory address */
 	if (src == dest)
@@ -311,7 +308,7 @@ str_copy(/*@unique@*/ string_t *dest, const string_t *src)
  * @param src source string
 */
 int
-str_move(/*@unique@*/ string_t *dest, string_t *src)
+str_move(string_t *dest, string_t *src)
 {
 	require (src != dest);
 
@@ -496,7 +493,7 @@ str_resize(string_t *str, size_t new_size)
  * @param src source string
 */
 int
-str_prepend(string_t *dest, /*@unique@*/ const string_t *src)
+str_prepend(string_t *dest, const string_t *src)
 {
 	string_t *buf;
 
@@ -536,7 +533,7 @@ str_append(string_t *dest, const string_t *src)
  * @todo Optimize this, don't just call str_cat().. 
 */
 int
-str_cat(string_t *dest, /*@unique@*/ const char *src)
+str_cat(string_t *dest, const char *src)
 {
 	size_t	src_len,
                 new_size;
@@ -1173,7 +1170,6 @@ str_subst_regex(string_t *src, const char *pattern, const char *replacement)
 
 
 /* Ignore warnings about accessing members of a regex_t */
-/*@-type@*/
 /**
  * Retrieve one or more substrings from a string.
  *
@@ -1225,7 +1221,6 @@ str_str_regex(const string_t *src, const char *pattern, ...)
 finally:
 	regfree(&preg);
 }
-/*@=type@*/
 
 
 /**
@@ -1324,8 +1319,6 @@ str_escape(string_t *dest, const string_t *src)
 }
 
 
-#ifndef S_SPLINT_S
-	// splint and gcc seem to disagree about the signedness of code
 /**
  * Compute the original string from a URI-encoded string.
  *
@@ -1358,7 +1351,6 @@ str_unescape(string_t *dest, const string_t *src)
 
 	str_move(dest, buf);
 }
-#endif
 
 
 /**
@@ -1396,10 +1388,8 @@ str_from_inet(string_t *dest, struct in_addr addr)
 	char buf[INET_ADDRSTRLEN + 1];
 
 	memset(&buf, 0, sizeof(buf));
-	/*@-type@*/
 	if (inet_ntop(PF_INET, &addr, (char *) &buf, sizeof(buf) - 1) == 0)
 		throw_errno("inet_ntop(3)");
-	/*@=type@*/
 	str_cpy(dest, buf);
 }
 
@@ -1430,7 +1420,6 @@ str_to_inet(struct in_addr *addr, const string_t *src)
 #else
 	// workaround
         /* Convert the ASCII address to the numeric address */
-	/*@-type@*/
         addr->s_addr = inet_addr(src->value);
 
         /* Special case: inet_addr returns -1 if an error occurred
@@ -1440,7 +1429,6 @@ str_to_inet(struct in_addr *addr, const string_t *src)
 		if (str_cmp(src, "255.255.255.255") != 0)
 			throw("parse error");
 	}
-	/*@=type@*/
 #endif
 }
 

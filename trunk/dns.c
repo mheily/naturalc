@@ -108,7 +108,7 @@ dns_library_init(void)
  * 
  */
 int
-dns_get_mx_list(/*@unused@*/ list_t *dest, /*@unused@*/ const string_t *domain)
+dns_get_mx_list(list_t *dest, const string_t *domain)
 {
 	union {
 		HEADER hdr;
@@ -319,11 +319,7 @@ dns_get_service_by_name(int *dest, char_t *name, char_t *proto)
 	if (ent == NULL)
 		throw_errno("getservbyname(3)");
 
-	/* Splint doesn't understand servent structs */
-	/*@-type@*/
 	*dest = ntohs(ent_copy.s_port);
-	/*@=type@*/
-
 }
 
 
@@ -361,13 +357,11 @@ dns_get_inet_by_name(list_t *dest, const string_t *host)
 	}
 			
 	/* Build a list containing each possible IP address */
-	/*@-type@*/
 	for ( ai = ai_list; ai != NULL; ai = ai->ai_next) {
 		sa = (struct sockaddr_in *) ai->ai_addr;
 		str_from_inet(buf, sa->sin_addr);
 		list_push(dest, buf);
 	}
-	/*@=type@*/
 
 finally:
 	if (ai_list != NULL)

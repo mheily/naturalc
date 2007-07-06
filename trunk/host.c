@@ -99,8 +99,6 @@ host_get_ifaddrs(list_t *dest, int family)
 	if (getifaddrs(&head) != 0)
 		throw_errno("getifaddrs(3)");
 
-	/* Splint doesn't understand sockaddr_in internals */
-	/*@-type@*/
 	for (cur = head; cur != NULL; cur = cur->ifa_next) {
 
 		/* Skip interfaces that don't match the requested family */
@@ -120,7 +118,6 @@ host_get_ifaddrs(list_t *dest, int family)
 
 		//log_debug("%s", cur->ifa_name);
 	}
-	/*@=type@*/
 	//list_print(dest); abort();
 
 finally:
