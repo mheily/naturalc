@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libnc
+Description:  The Natural C standard library
+Version: @VERSION@
+Libs: -L${libdir} -lnc -lpthread
+Cflags: -I${includedir}/ncc -D_REENTRANT=1

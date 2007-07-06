@@ -1,0 +1,818 @@
+#!/usr/bin/env perl
+#
+# NCC: A prototype compiler for the Natural C language
+#
+# Copyright (c) 2007 Mark Heily <devel@heily.com>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+use strict;
+use warnings;
+
+use Data::Dumper;
+use Carp;
+
+# The version number of the compiler
+our $NCC_VERSION = '0.3';
+ 
+# If TRUE, debugging information will be enabled:
+#
+#     * Errors in the generated `.c' files will be shown to the caller
+#       instead of redirecting them to the source `.nc' file.
+#
+
+our $DEBUG = $ENV{NCC_DEBUG} ? 1 : 0;
+
+# If TRUE, a seprate NCC compilation log will be maintained in 'ncc.log'
+#
+our $LOGGING = 0;
+
+# A regular expression that matches all valid C identifiers
+our $C_IDENTIFIER = "[A-Za-z_][A-Za-z0-9_]*";
+
+# A list of all built-in Natural C datatypes
+our @NC_TYPES = qw(string list hash socket file);
+
+# A list of user-defined classes via the 'class' keyword
+our @USER_TYPES = qw();
+
+# The list of Natural-C keywords that should not be wrapped in a 'try()'
+# block even though they are implemented as function macros.
+# Also, some C functions that should not be wrapped either.
+our @NC_KEYWORDS = qw(require destroy 
+			log_debug log_debug2 log_warning log_error log_info 
+			log_notice
+			throw throwf throw_if throw_errno throw_silent throw_fatal throw_response throw_html
+			str_to_pointer
+			thread_exit process_exit exit abort
+			array_new array_destroy array_truncate array_push array_pop array_grow array_foreach
+			mutex_lock mutex_unlock
+			hash_lock hash_unlock
+			mem_calloc
+			list_wrlock list_rdlock list_unlock
+			memset memcpy strncpy
+			);
+# 
+# Global header inclusion table
+# 
+# Stores a list of alternate directories, specified on the command line
+# using the -I<path> syntax, where to search for header files 
+# during an #include command.
+# 
+our @INCLUDES = ( '.', '..', '/usr/include', '/usr/local/include' );
+
+#
+# Global header table
+#
+# This table notes if a particular header has been processed. This
+# is needed to prevent infinite loops caused by circular header dependencies.
+# A header file is evaluated only one time during an NCC invocation, regardless
+# of the number of times it is #included.
+our %HEADER = ();
+
+#
+# Global class table
+#
+# This table tracks all known classes and their members
+our $CLASS = +{ 
+		'__example__' => +{
+				prefix => undef,
+				method => +{},
+				attrib => +{},
+				},
+		};
+
+# Global function symbol table
+#
+# The name of each function and function macro is stored in this table
+# so that "internal" symbols can be wrapped in a try() block while 
+# "external" symbols (from the system's C library, for example) are 
+# not automatically wrapped.
+our %FUNC_SYM = ();
+
+sub usage()
+{
+	if ($#ARGV < 0) {
+		print "ncc: no input files\n";
+	}
+
+	elsif ($ARGV[0] eq '-v') {
+		print "ncc version $NCC_VERSION\n";
+		return 0;
+	}
+
+	return 1;
+}
+
+sub printlog($)
+{
+	print NCCLOG "$_[0]\n" if $LOGGING;
+	print STDERR "$_[0]\n" if $DEBUG;
+}
+
+sub dbg($)
+{ 
+	print STDERR "$_[0]\n" if $DEBUG;
+}
+
+# 
+# Run a system command and die if it fails
+#
+sub run_system($)
+{
+	my $cmd = shift;
+
+	# Double quotes must be escaped or they lose their meaning
+	$cmd =~ s/"/\\"/g;
+	printlog("exec: $cmd");
+	system $cmd;
+	if ($? == -1) {
+		dbg("failed to execute: $!\n");
+		exit 254;
+	}
+	elsif ($? & 127) {
+		#printf("child died with signal %d", ($? & 127));
+		exit 254;
+	}
+	else {
+		#printf("child exited with value %d\n", $? >> 8);
+		exit 254 if ($? >> 8 != 0);
+	}
+}
+
+#
+# Compare the modification times of two files.
+#
+# Returns: true if the files have different mtimes, or false if the mtimes are the same
+#
+sub cmp_mtime($$)
+{
+	my ($fn1, $fn2) = @_;
+	if (! -e $fn1 || ! -e $fn2) {
+	       return 1;
+	}
+	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+                      $atime,$mtime1,$mtime2,$ctime,$blksize,$blocks);
+
+	($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+                      $atime,$mtime1,$ctime,$blksize,$blocks)
+                          = stat($fn1) or die "$fn1: $!";
+
+	($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+                      $atime,$mtime2,$ctime,$blksize,$blocks)
+                          = stat($fn2) or die "$fn2: $!";
+
+	return ( ($mtime1 == $mtime2) ? 0 : 1);
+}
+
+
+#
+# Read the contents of an entire file into memory
+#
+sub readfile($)
+{
+	my ($fn) = @_;
+	my $path = $fn;
+	my @in;
+
+	# If the filename is surrounded in quotes, it is absolute.
+	if ($fn =~ /^"(.*?)"$/) {
+		$path = $1;
+
+	# If the filename is surrounded by brackets, search the @INCLUDES paths
+	} elsif ($fn =~ /^<(.*?)>$/) {
+		undef $path;
+		$fn = $1;
+
+		# Process the INCLUDES paths to find the file
+		foreach my $base (@INCLUDES) { 
+			$path = $base . '/' . $fn;
+			last if -e $path;
+		}
+		confess("file not found: $fn") unless $path;
+	}
+
+
+	# Read the contents of the file
+	open (my $fd, "<$path") or confess("$path: $!");
+	my @lines = <$fd> or die "reading $path: $!";
+	close($fd) or die "closing $path: $!";
+
+	return \@lines;
+}
+
+
+#
+# General purpose C lexer
+#
+sub lexer($)
+{
+	my $raw = $_[0];
+
+	# Remove leading and trailing whitespace
+	$raw =~ s/^\s+//mg;
+	$raw =~ s/\s+$//mg;
+	$raw =~ s/,\s*/,/g;
+
+	# Place each statement on a single line and remove comments
+	$raw =~ s/\/\/.*//mg;
+	$raw =~ s|/\*.*\*/||mg;
+	$raw =~ s/\n//mg;
+
+	# Compress blocks of whitespace into a single token
+	$raw =~ s/\s+/ /g;
+
+	# Generate a list of tokens
+	my @in = split /;/, $raw;
+	return @in;
+}
+
+
+#
+# Lexer/parser for function preamble
+#
+sub preamble_parse($)
+{
+	my @lines = lexer ( $_[0] );
+	my $nc_type_regex = '(' . join('|', @NC_TYPES) . ')_t';
+	my $cur_type;
+	my $nullify = '';
+	my $new_code = '';
+	my $destroy_code = '';
+	my $result = +{
+			new_code => '',
+			destroy_code => '',
+			var => +{},
+	};
+
+	foreach my $line (@lines) {
+		my ($type, $id_list) = split / /, $line, 2;
+
+		# Ignore non-builtin types
+		next unless $type =~ /^$nc_type_regex$/;
+
+		# Get the prefix, based on the type
+		my $prefix = $type;
+		$prefix =~ s/_t$//;
+		# Kludge: string_t uses the str_ prefix
+		$prefix = 'str' if $type eq 'string_t';
+
+		foreach my $id ( split /\s*,\s*/, $id_list) {
+			my $id_type = $type;
+
+			# Move any '*' (pointer) prefixes to the type name
+			if ($id =~ /^\*+/) {
+				$id = $';
+				$id_type .= ' ' . $&;
+			}
+
+			# Add the variable to the function definition
+			$result->{var}->{$id} = $id_type;
+
+			# Do not auto-allocate pointers that are explicitly assigned
+			next if $id =~ /=/;
+
+			# Set the variable to NULL before calling new()
+			my $raw_id = $id; 
+			$nullify .= "$raw_id = NULL; ";
+
+			# Pass indirect pointers to the variable
+			$result->{new_code} .= "try (${prefix}_new(\&$id)); ";
+			$result->{destroy_code} .= "destroy($prefix, \&$id); ";
+		}
+	}
+
+	# Set all variables to NULL before calling new()
+	$result->{new_code} = $nullify . $result->{new_code};
+
+	return $result;
+}
+
+
+#
+# Parse a class definition
+#
+sub class_parse($$)
+{
+	my ($in_ref, $line) = @_;
+	my @in = @{ $in_ref };
+	my ($prefix, $typedef, %method);
+
+	# Get the class prefix
+	$in[$line] =~ /^typedef class ($C_IDENTIFIER) /;
+	$prefix = $1;
+
+	for (my $i = $line; $i <= $#in; $i++) {
+		if ($in[$i] =~ /^\s*int ${prefix}_($C_IDENTIFIER)\s*\((.*)\);/) {
+			$method{$1} = $2;
+		} 
+
+		elsif (not defined $typedef and $in[$i] =~ /^} ($C_IDENTIFIER);/) {
+			$typedef = $1;
+		}
+	}
+
+	# Parse each method's parameters
+	foreach my $key (keys %method) {
+		my @param = split /\s*,\s*/, $method{$key};
+		$method{$key} = \@param;
+	}
+
+	# WORKAROUND: why is typedef not defined??  
+	if (defined $typedef) {
+		$CLASS->{$typedef} = +{};
+		$CLASS->{$typedef}->{prefix} = $prefix;
+		$CLASS->{$typedef}->{method} = \%method;
+	}
+	#warn "prefix=`$prefix' typedef=`$typedef' " . Dumper(\%method);
+}
+
+
+#
+# Compare two types for equality
+#
+sub type_compare($$)
+{
+	my ($t1, $t2) = @_;
+
+	# Normalize by removing annotations and qualifiers
+	$t1 =~ s|/\*.*\*/||;
+	$t2 =~ s|/\*.*\*/||;
+	$t1 =~ s/const//;
+	$t2 =~ s/const//;
+
+	return $t1 eq $t2;
+}
+
+#
+# Convert a method invocation into a standard function call
+#
+# e.g. convert 'myString.append(foo)' into 'str_append(myString, foo)'
+#
+sub method_invoke
+{
+	my ($line_ref, $func) = @_;
+	my @new_param;
+	my $found = 0;
+
+	# Parse the line
+	$$line_ref =~ /^\s*(${C_IDENTIFIER})\.(${C_IDENTIFIER})\s*\((.*)\);/;
+	my ($self, $method, $param_list) = ($1, $2, $3);
+
+	# Parse the parameter list
+	my @param = split /\s*,\s*/, $param_list;
+
+	# Determine the type of the 'self' variable
+	my $type = $func->{var}->{$self} 
+		or die "unknown variable: `$self'";
+	$type =~ s/ .*//;
+
+	# Lookup the method definition
+	my $def = $CLASS->{$type}->{method}->{$method};
+	my $prefix = $CLASS->{$type}->{prefix};
+	unless ($def and $prefix) {
+		goto error;
+	}
+
+	# Generate the new parameters list
+	for (my $i = 0; $i <= $#param + 1; $i++) {
+		# Find the first parameter that matches the type of 'self'
+		#warn $type . ' ' . $def->[$i];
+		if (not $found and $def->[$i] =~ /$type \*/) {
+			$found = 1;
+			push @new_param, $self;
+		}
+		push @new_param, $param[$i] if defined $param[$i];
+	}
+	unless ($found) {
+		warn "bad method signature for ${type}' . '::' . '${method}";
+		goto error;
+	}
+
+	# Generate the new statement
+	my $stmt = "\t\t" . "try (${prefix}_${method}(" . join(', ', @new_param) . '));';
+	return $stmt;
+
+error:
+	warn Dumper($func);
+	warn "$self - $method - $param_list; type=`$type'; \n" .
+		"\n parameters:" . Dumper(\@param) . 
+		"\n method definition:" . Dumper($def) .
+		"\n new parameters:" . Dumper(\@new_param) .
+		"\n result: $stmt\n";
+	die "Internal compiler error";
+}
+
+
+#
+#
+# Emulate the effect of the C preprocessor.
+#
+# FIXME - TODO - 
+#	Make warnings if '__retval = -1' is seen or if 'return -1' is seen.
+#	This forces the caller to use throw_silent() which respects the 'finally' block.
+sub cpp
+{
+	my @in = @{ $_[0] };
+
+	for (my $i = 0; $i <= $#in; $i++) {
+
+		# Include additional headers
+		if ($in[$i] =~ m|^#include |) {
+			my $path = $';
+			chomp $path;
+			$path =~ s/\s*$//;
+
+			# WORKAROUND - skip system headers
+			next if ($path =~ /^</ and not $path =~ m|nc/|);
+
+			# Don't process header files more than once
+			unless (exists $HEADER{$path}) {
+				$HEADER{$path} = 1;
+
+				# Parse the header file
+				printlog("#include `$path'");
+				cpp (readfile($path));
+			}
+		}
+
+		# Look for function macros
+		elsif ($in[$i] =~ /^#define ([a-zA-z0-9_]+)\(/) {
+			#dbg("defining `$1'");
+			$FUNC_SYM{$1} = 1;
+			}
+
+		# Look for class definitions
+		elsif ($in[$i] =~ /^typedef class ($C_IDENTIFIER) /) {
+
+			# Run the class parser
+			class_parse(\@in, $i);
+
+			# Add the type to the list of known types
+			push @USER_TYPES, $1 . '_t';
+
+			# Kludge: Also add it to the NatC types
+			#	  so we don't have to check two type lists
+			push @NC_TYPES, $1;
+		}
+		
+		# Look for function declarations within header files
+		elsif ($in[$i] =~ /^(static |extern |inline )*(int|size_t|char|void)\s+(\**)([a-zA-z0-9_]+)\(/) {
+				#dbg("defining `$4'");
+				# Don't add functions that return void
+				$FUNC_SYM{$4} = $' unless ($2 eq 'void' and $3 eq '');
+		}
+
+		# Look for function declarations within source files
+		elsif ($in[$i] =~ /^\**([a-zA-z0-9_]+)\(/) {
+				#dbg("defining `$1'");
+				# Don't add functions that return void
+			        if (defined $in[$i - 1] and not $in[$i - 1] =~ /void\s*$/) {
+			          $FUNC_SYM{$1} = 1;
+			        }
+		}
+	}
+}
+
+
+sub parser($)
+{
+	my ($fn) = @_;
+	my (@in, @out);
+	my $stmt = 0;
+	my $line = '';
+	my $uniq = 0;
+
+	# Variables relevant to the current function
+	my $inside_function_block = 0;
+	my $inside_function_preamble = 0;
+	my $has_catch_label = 0;
+	my $has_finally_label = 0;
+	my $func_preamble_lineno;
+	my $func_body_lineno;
+	my $func_preamble = '';
+	my $func;
+	my ($auto_new, $auto_destroy) = ('', '');
+
+	# Generate the output filename
+	my $outfn = $fn;
+	$outfn =~ s/\.nc$/.c/;
+	$outfn = '.c/' . $outfn;
+	printlog ("parsing: in=`$fn' out=`$outfn'");
+
+	printlog("parsing `$fn'");
+
+	# Read the input
+	@in = @{ readfile($fn) };
+
+	# Implicitly include the Natural C language headers
+	# (unless we are compiling libnc itself)
+	unless (-e './ncc') {
+		unshift @in, "#include <nc.h>", "#line 1";
+	}
+
+	# Run the C preprocessor emulator
+	cpp(\@in);
+
+	# Delete Natural-C reserved keywords from the symbol table
+	foreach my $keyword (@NC_KEYWORDS) {
+		delete $FUNC_SYM{$keyword};
+	}
+	#die Dumper(\%FUNC_SYM);
+
+	# Tell GCC to pretend that the generated file is the original file
+	unless ($DEBUG) {
+		push @out, "#line 1 \"$fn\"";
+	}
+
+	# Process each line
+	for (my $i = 0; $i <= $#in; $i++) {{
+		### The following rules are not context-aware.
+
+		# Parse the beginning of a function
+		if ($in[$i] =~ /^{\s*$/) {
+			$func_preamble_lineno = $#out + 1;
+			$func_preamble = '';
+			$func_body_lineno = $#out + 1;
+			$inside_function_block = 1;
+			$inside_function_preamble = 1;
+			$has_catch_label = 0;
+			$has_finally_label = 0;
+			push @out, "{             int __retval = 0;";
+			next;
+		}
+
+		# Parse each local variable
+		if ($inside_function_preamble) {
+			$func_preamble .= $in[$i];
+		}
+
+		# Mark the start of the function body
+		# (i.e. the first statement after all local variables are defined)
+		if ($inside_function_preamble and $in[$i] =~ /^\s*$/) {
+
+			$func = preamble_parse($func_preamble);
+			#warn Dumper($result);
+			$auto_new = $func->{new_code};
+			$auto_destroy = $func->{destroy_code};
+
+			# Reset the preamble to empty
+			$inside_function_preamble = 0;
+			$func_preamble = '';
+			
+			$func_body_lineno = $#out;
+
+			# Insert the automatic new() code
+			push @out, $auto_new;
+			next;
+		}
+
+		# Parse the end of a function
+		# 	- Force all functions to return __retval
+		if ($in[$i] =~ /^}\s*$/) {
+			$inside_function_block = 0;
+			my $s = '';
+
+			# Add a NOOP to avoid compiler warnings about 'catch:' being unused
+			$s .= "if (0) goto catch; ";
+
+			# Add an implicit 'catch' label, if necessary
+			if (!$has_catch_label) {
+				$s .= "goto finally;  catch: __retval = -1; ";
+			}
+
+			# Add an implicit 'finally' label, if necessary
+			if (!$has_finally_label) {
+				$s .= "finally: ";
+			}
+
+			# Add the automatic destroy() calls
+			$s .= $auto_destroy;
+
+			$s .= "return __retval;";
+			push @out, "$s }";
+			next;
+		}
+
+		# Modify 'catch:' labels to skip to the 'finally:' block 
+		# if no exceptions were thrown.
+		if ($in[$i] =~ /^catch:\s*$/) {
+			$has_catch_label = 1;
+			push @out, "goto finally; catch: __retval = -1;";
+			next;
+		}
+
+		# Modify 'finally' labels to include an implicit 'catch' label, if needed.
+		if ($in[$i] =~ /^finally:\s*$/) {
+		       $has_finally_label = 1;
+		       if (!$has_catch_label) {
+			       $has_catch_label = 1;
+			       push @out, "goto finally; catch: __retval = -1; finally:";
+		       } else {
+			       push @out, "finally:";
+		       }
+		       next;
+		}
+
+		# Implement the 'foreach' construct
+		# @todo this makes a copy of each element (!) -- need str_clone()
+		if ($in[$i] =~ /^(\s*)foreach\s*\((.*?),\s*(.*?)\)\s*{/) {
+			my $cur = 'nc_cur' . $uniq++;
+			$out[$func_preamble_lineno] .= "list_entry_t *${cur};";
+			push @out, "$1for ($cur = ${3}->head; $cur; $cur = ${cur}->next) {  str_copy($2,${cur}->value);";
+			next;
+		}
+
+		# Modify 'return' statements to set __retval and execute 'finally'
+		if ($in[$i] =~ /^(\s*)return\s*(.+?);/) {
+			push @out, "${1}do { __retval = ${2}; goto finally; } while (0);";
+			next;
+		}
+
+		# Do not allow users to modify __retval directly
+		if ($in[$i] =~ /^(\s*)__retval =/) {
+			push @out, "#warning Please do not modify __retval directly.";
+			next;
+		}
+
+		# Convert OOP method invocation syntax into standard C syntax
+		if ($in[$i] =~ /^\s*${C_IDENTIFIER}\.${C_IDENTIFIER}\s*\(/) {
+			push @out, method_invoke(\$in[$i], $func);
+			next;
+		}
+
+		### The following rules are context-aware and must handle multiple lines
+
+		# Add the current line to the context buffer
+		chomp $in[$i];
+		if (length $line) {
+			$line .= "\n" . $in[$i];
+		} else {
+			$line = $in[$i];
+		}
+
+		# If the line is a not a bare statement, skip it
+		$line =~ /^(\s+)([A-Za-z0-9_]+)\s*\(/sm;
+		goto next_line unless defined $2;
+		goto next_line if $2 =~ /^(if|for|switch|while|do|foreach)$/;
+			
+		# Merge multiline statements into a single line
+		next unless $line =~ /;\s*$/sm;
+	
+		# Automatically check the return value of all statements
+		# FIXME - doesn't handle strings with embedded ');'
+		if ($line =~ /^(\s+)([A-Za-z0-9_]+)\s*\((.*?)\);/sm) {
+			my $post = defined $' ? $' : '';
+
+			# Skip 'foreach' and 'catch' blocks
+			goto next_line if ($2 =~ /^(foreach|catch)$/);
+
+			if (exists $FUNC_SYM{$2})
+			{
+				warn $line if $line =~ /if /;
+				$line = "${1}try ($2($3));$post";
+			}
+		}
+		
+next_line:
+		# Add the line to the output stream
+		push @out, $line;
+		$line = '';
+		$stmt = 0;
+	}}
+
+	# Write the output
+	unlink $outfn if -e $outfn;
+	eval {
+		open (my $fd, ">$outfn") or die "$outfn: $!";
+		print $fd join ("\n", @out), "\n";
+		close($fd);
+	};
+	if ($@) {
+		die "$outfn: $@";
+	}
+	my $mode = 0440;
+	chmod $mode, $outfn;
+
+	# Set the timestamp to match the input file
+	system "touch -r $fn $outfn";
+
+	return $outfn;
+}
+
+#
+# Invoke the splint(1) static analysis tool on a source file
+#  
+sub run_splint($)
+{
+	my $path = shift;
+
+	# Generate a list of header inclusion paths
+	my @inc;
+	foreach my $base (@INCLUDES) {
+		push @inc, '-I' . $base;
+	}
+	my $includes = join(' ', @inc);
+	
+	# splint(1) requires various preprocessor #defines
+ 	my $defs = '-Dclass=struct -DUNIT_TESTS=1 -DWITH_OPENSSL=0 -Du_int=uint32_t -Du_short=uint8_t -Du_char=char -Din_addr_t=int -Dkey_t=int -D__OpenBSD__=1 -Du_int32_t=uint32_t -Du_int16_t=uint16_t -DHAVE_PTHREAD_H -DWITH_NDBM -Devent_t="struct epoll_event" -Dsighandler_t="void *"';
+
+	# Workaround for NDBM header problem on OpenBSD
+	$defs .= ' -DHAVE_NDBM_H=1' if -e '/usr/include/ndbm.h';
+
+	# Ignore certain warnings
+	my $ignores = '-preproc -globs -unrecog -usedef -nullderef -exportlocal -predboolint -nullpass -nullstate -compdef -compdestroy +boolint -unqualifiedtrans -mustfreeonly -branchstate -dependenttrans -usereleased -kepttrans -onlytrans -temptrans -observertrans -immediatetrans -compmempass +charintliteral -boolops +posixlib -uniondef';
+
+	# Invoke splint(1) on Linux systems
+	# NOTE: Splint is not run on OpenBSD (or other systems)
+	# 	because in it's current state it has trouble parsing
+	#	system headers, and throws impossible-to-fix errors 
+	#	for many basic types like in_addr_t.
+	if (`uname` =~ /Linux/) {	
+		run_system "splint -I. -I.. +quiet $includes $defs $ignores $path";
+	}
+
+	return $path;
+}
+
+sub MAIN()
+{
+	# A list of source files that will be processed
+	my @src;
+	my $gcc = $ENV{GCC} || 'gcc';
+	my @NEW_ARGV;
+
+	if ($#ARGV < 0 || $ARGV[0] eq '-v') {
+		return usage();
+	}
+
+	$LOGGING = 1 if exists $ENV{NCC_LOG};
+	if ($LOGGING) {
+		open NCCLOG, ">ncc.log" or die $!;
+		printlog(join(' ', @ARGV));
+	}	
+
+	# Generated C files are stored in a subdirectory named '.c/'
+	mkdir '.c';
+
+	# Process each argument ..
+	foreach my $arg (@ARGV) {
+
+		# Run source files through the Natural C parser
+		if ($arg =~ /\.n?c$/) {
+			die 'invalid filename' 
+				unless $arg =~ m|^[A-Za-z0-9/_.-]+$|;
+			push @src, $arg;
+			push @NEW_ARGV, $ENV{NCC_SPLINT} ? run_splint( parser($arg) )
+						: parser($arg);
+		}
+
+		# Add additional header inclusion paths 
+		elsif ($arg =~ /-I/) {
+			my $inc = $';
+			die 'invalid path' 
+				unless $arg =~ m|^[A-Za-z0-9/_.-]+$|;
+			push @INCLUDES, $inc;
+			push @NEW_ARGV, $arg;
+		}
+
+		else {
+			push @NEW_ARGV, $arg;
+		};
+	}
+
+	# Tell GCC to always link with libnc when creating an executable
+	# This is not needed when building libnc itself.
+	#push @NEW_ARGV, "-lnc" unless -e '../nc.h';
+
+	# XXX-FIXME-BIG HACK
+	# Workaround for lack of variables from config.h
+	unshift @NEW_ARGV, "-DHAVE_EPOLL_WAIT=1";
+
+	# XXX-FIXME-BIG HACK
+	# Workaround until the <nc.h> header is injected into all sources by default.
+	unshift @NEW_ARGV, "-Dclass=struct";
+
+	# Implicitly include the Natural C language headers
+	# (unless we are compiling libnc itself)
+	unshift @NEW_ARGV, "-include 'nc.h'" unless -e './nc.h';
+
+	# Compile the generated source(s) with GCC
+	run_system("$gcc " . join(' ', @NEW_ARGV));
+
+}
+
+#----------------------------------------------------------------------------#
+
+exit MAIN();
