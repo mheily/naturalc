@@ -43,12 +43,12 @@ CONFIG_CLEAN_FILES =
 SOURCES =
 DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /tmp/naturalc/missing --run aclocal-1.10
-AMTAR = ${SHELL} /tmp/naturalc/missing --run tar
+ACLOCAL = ${SHELL} /home/mark/ncc/missing --run aclocal-1.10
+AMTAR = ${SHELL} /home/mark/ncc/missing --run tar
 AR = ar
-AUTOCONF = ${SHELL} /tmp/naturalc/missing --run autoconf
-AUTOHEADER = ${SHELL} /tmp/naturalc/missing --run autoheader
-AUTOMAKE = ${SHELL} /tmp/naturalc/missing --run automake-1.10
+AUTOCONF = ${SHELL} /home/mark/ncc/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/mark/ncc/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/mark/ncc/missing --run automake-1.10
 AWK = gawk
 CC = ./ncc
 CCDEPMODE = depmode=gcc3
@@ -82,7 +82,7 @@ LIBS = -lresolv
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LN_S = ln -s
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /tmp/naturalc/missing --run makeinfo
+MAKEINFO = ${SHELL} /home/mark/ncc/missing --run makeinfo
 MKDIR_P = /bin/mkdir -p
 OBJEXT = o
 PACKAGE = ncc
@@ -97,10 +97,10 @@ SET_MAKE =
 SHELL = /bin/bash
 STRIP = strip
 VERSION = 1.1
-abs_builddir = /tmp/naturalc/doc
-abs_srcdir = /tmp/naturalc/doc
-abs_top_builddir = /tmp/naturalc
-abs_top_srcdir = /tmp/naturalc
+abs_builddir = /home/mark/ncc/doc
+abs_srcdir = /home/mark/ncc/doc
+abs_top_builddir = /home/mark/ncc
+abs_top_srcdir = /home/mark/ncc
 ac_ct_CC = gcc
 ac_ct_CXX = g++
 ac_ct_F77 = 
@@ -129,7 +129,7 @@ host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = $(SHELL) /tmp/naturalc/install-sh
+install_sh = $(SHELL) /home/mark/ncc/install-sh
 ipcdir = /var/run
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
@@ -150,7 +150,10 @@ sysconfdir = ${prefix}/etc
 target_alias = 
 top_builddir = ..
 top_srcdir = ..
-EXTRA_DIST = www/index.html www/naturalc.html www/Makefile \
+EXTRA_DIST = \
+	www/bugs.php      www/footer.html  www/index.php  www/naturalc.html \
+	www/docs.php      www/header.html  www/lists.php  www/svn.php \
+	www/download.php  www/header.png   www/Makefile \
 	docbook/content.xml  docbook/download.xml  docbook/license.xml  \
 	docbook/links.xml  docbook/Makefile  docbook/naturalc.xml  docbook/spec.xml
 

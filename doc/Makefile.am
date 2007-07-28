@@ -1,4 +1,7 @@
-EXTRA_DIST=	www/index.html www/naturalc.html www/Makefile \
+EXTRA_DIST=	\
+	www/bugs.php      www/footer.html  www/index.php  www/naturalc.html \
+	www/docs.php      www/header.html  www/lists.php  www/svn.php \
+	www/download.php  www/header.png   www/Makefile \
 	docbook/content.xml  docbook/download.xml  docbook/license.xml  \
 	docbook/links.xml  docbook/Makefile  docbook/naturalc.xml  docbook/spec.xml
 
