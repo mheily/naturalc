@@ -1022,7 +1022,7 @@ file_from_fd(file_t *fo, const int fd)
  */
 int file_ls_by_type(list_t *dest, const string_t *path, int type)
 {
-	string_t *item = NULL;
+	string_t *item;
 	list_t *buf;
 	stat_t st;
 
