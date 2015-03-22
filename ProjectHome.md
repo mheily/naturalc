@@ -1,0 +1,1 @@
+Natural C is an improved version of the classic C programming language. This project provides a compiler and a standard library that provides a set of dynamic datatypes including lists, hash tables, and strings.
